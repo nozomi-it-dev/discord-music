@@ -11,4 +11,5 @@ RUN npm ci --omit=dev
 
 COPY src ./src
 
-CMD ["node", "src/index.js"]
+# อัปเดต yt-dlp ทุกครั้งที่ start — restart container = ได้ yt-dlp ล่าสุดโดยไม่ต้อง rebuild
+CMD ["sh", "-c", "yt-dlp -U || true; exec node src/index.js"]

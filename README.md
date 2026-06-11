@@ -126,4 +126,4 @@ Bot deploy บน VM `app` (192.168.1.14) ผ่าน Portainer — ไม่�
 
 ### หมายเหตุเรื่อง yt-dlp
 
-YouTube เปลี่ยนระบบบ่อย ถ้าเพลงเริ่มเล่นไม่ได้ (yt-dlp error ใน log) ให้ **rebuild image ใหม่** — Dockerfile ดึง yt-dlp เวอร์ชันล่าสุดตอน build เสมอ
+YouTube เปลี่ยนระบบบ่อย ถ้าเพลงเริ่มเล่นไม่ได้ (yt-dlp error ใน log) ให้ **restart container** — ทุกครั้งที่ start บอทจะรัน `yt-dlp -U` อัปเดตตัวเองเป็นเวอร์ชันล่าสุดก่อนเสมอ (ถ้า restart แล้วยังไม่หาย แปลว่า yt-dlp ยังออก fix ไม่ทัน รอวัน-สองวันแล้ว restart ใหม่)
