@@ -1,0 +1,22 @@
+{
+  "name": "manora",
+  "version": "0.1.0",
+  "description": "Discord music bot — เล่นเพลงจาก YouTube (ลิงค์/ค้นหา) ไม่มี ads",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "deploy": "node src/bot/deploy-commands.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@snazzah/davey": "^0.1.11",
+    "discord.js": "^14.26.4",
+    "dotenv": "^16.6.1",
+    "libsodium-wrappers": "^0.8.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
