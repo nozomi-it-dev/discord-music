@@ -2,7 +2,8 @@ import { MessageFlags } from 'discord.js';
 import { getPlayer, peekPlayer, destroyPlayer } from '../../player/index.js';
 import { resolveTracks } from '../../player/ytdlp.js';
 import { fmtDuration } from '../../utils/format.js';
-import { cleanTitle, searchLyrics, chunkLyrics } from '../../utils/lyrics.js';
+import { cleanTitle, cleanChannel, searchLyrics, findLyricsForTrack, chunkLyrics } from '../../utils/lyrics.js';
+import { getTrackMeta } from '../../player/ytdlp.js';
 
 const LOOP_LABEL = { off: 'ปิด', track: 'วนเพลงเดียว', queue: 'วนทั้งคิว' };
 
@@ -169,14 +170,7 @@ const handlers = {
     const query = interaction.options.getString('query');
     const player = peekPlayer(interaction.guildId);
 
-    let search;
-    let duration = 0;
-    if (query) {
-      search = query;
-    } else if (player?.current) {
-      search = cleanTitle(player.current.title);
-      duration = player.current.duration;
-    } else {
+    if (!query && !player?.current) {
       return interaction.reply({
         content: 'ตอนนี้ไม่มีเพลงกำลังเล่นค่ะ ใส่ชื่อเพลงใน query แทนได้นะคะ',
         flags: MessageFlags.Ephemeral,
@@ -184,9 +178,27 @@ const handlers = {
     }
 
     await interaction.deferReply();
-    const found = await searchLyrics(search, duration);
+    let found;
+    let label;
+    if (query) {
+      label = query;
+      found = await searchLyrics(query);
+    } else {
+      const t = player.current;
+      label = cleanTitle(t.title);
+      // ดึงชื่อศิลปิน/channel จากวิดีโอจริงมาช่วยค้น — ชื่อคลิปอย่างเดียวมักกำกวม
+      const meta = await getTrackMeta(t.url).catch(() => null);
+      const queries = [
+        meta?.artist && meta?.track ? `${meta.track} ${meta.artist}` : null,
+        meta?.channel ? `${label} ${cleanChannel(meta.channel)}` : null,
+        label,
+      ];
+      found = await findLyricsForTrack(queries, meta?.duration || t.duration);
+    }
     if (!found) {
-      return interaction.editReply(`หาเนื้อเพลง "${search}" ไม่เจอค่ะ ลองพิมพ์ชื่อเพลงกับศิลปินใน query ดูนะคะ`);
+      return interaction.editReply(
+        `หาเนื้อเพลงที่ตรงกับ "${label}" ไม่เจอค่ะ ลองพิมพ์ชื่อเพลงกับศิลปินใน query ดูนะคะ`
+      );
     }
 
     const chunks = chunkLyrics(found.lyrics);

@@ -63,6 +63,18 @@ export async function getRelatedTrack(url, excludeIds = []) {
   };
 }
 
+// ดึง metadata เต็มของวิดีโอเดียว (ช้ากว่า flat แต่ได้ชื่อศิลปิน/channel) — ใช้ตอนค้นเนื้อเพลง
+export async function getTrackMeta(url) {
+  const json = await runJson(['-J', '--no-playlist', '--no-warnings', url]);
+  return {
+    track: json.track || null,
+    artist: json.artist || json.creator || null,
+    channel: json.channel || json.uploader || null,
+    title: json.title || '',
+    duration: json.duration || 0,
+  };
+}
+
 // คืน array ของ track: { url, title, duration }
 // query เป็นได้ทั้งลิงค์เพลงเดียว, ลิงค์ playlist, หรือชื่อเพลง (ค้น YouTube เอาผลแรก)
 export async function resolveTracks(query) {
