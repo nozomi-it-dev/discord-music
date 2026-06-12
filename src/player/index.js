@@ -10,6 +10,7 @@ import {
 } from '@discordjs/voice';
 import { EmbedBuilder } from 'discord.js';
 import { createTrackStream } from './stream.js';
+import { getRelatedTrack, videoIdFromUrl } from './ytdlp.js';
 import { fmtDuration } from '../utils/format.js';
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // ไม่มีเพลงในคิว 5 นาที → ออกจากห้อง
@@ -45,6 +46,8 @@ class GuildPlayer {
     this.queue = [];
     this.current = null;
     this.loopMode = 'off'; // off | track | queue
+    this.autoplay = true; // คิวหมดแล้วหาเพลงที่เกี่ยวข้องเล่นต่อเอง
+    this.history = []; // id เพลงที่เล่นล่าสุด ไว้กัน autoplay วนเพลงซ้ำ
     this.volume = 100;
     this.connection = null;
     this.streamHandle = null;
@@ -92,9 +95,10 @@ class GuildPlayer {
     });
   }
 
-  enqueue(tracks, requestedBy) {
+  enqueue(tracks, requestedBy, { next = false } = {}) {
     for (const t of tracks) t.requestedBy = requestedBy;
-    this.queue.push(...tracks);
+    if (next) this.queue.unshift(...tracks);
+    else this.queue.push(...tracks);
     this.#clearIdleTimer();
     if (!this.current) {
       this.#startTrack(this.queue.shift());
@@ -172,7 +176,22 @@ class GuildPlayer {
     this.forceSkip = false;
 
     if (next) this.#startTrack(next);
+    else if (this.autoplay && finished) this.#autoplayNext(finished);
     else this.#startIdleTimer();
+  }
+
+  // คิวหมด — หาเพลงที่เกี่ยวข้องกับเพลงที่เพิ่งจบมาเล่นต่อ
+  async #autoplayNext(finished) {
+    this.#startIdleTimer(); // กันค้าง: ถ้าหาไม่เจอให้ timeout เดิมพาออกจากห้อง
+    try {
+      const track = await getRelatedTrack(finished.url, this.history);
+      // ระหว่างรอ yt-dlp อาจมีคนสั่ง /play หรือ /stop ไปแล้ว
+      if (this.destroyed || this.current || this.queue.length || !track) return;
+      track.requestedBy = 'เล่นต่ออัตโนมัติ';
+      this.#startTrack(track);
+    } catch (err) {
+      console.error('autoplay หาเพลงต่อไม่สำเร็จ:', err.message);
+    }
   }
 
   #startTrack(track, seek = 0, announce = true) {
@@ -185,6 +204,11 @@ class GuildPlayer {
       });
       this.seekOffset = seek;
       this.current = track;
+      const id = videoIdFromUrl(track.url);
+      if (id && this.history[this.history.length - 1] !== id) {
+        this.history.push(id);
+        if (this.history.length > 20) this.history.shift();
+      }
       this.audioPlayer.play(this.resource);
       if (announce) this.#announce(track);
     } catch (err) {

@@ -32,6 +32,37 @@ function runJson(args) {
   });
 }
 
+export function videoIdFromUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'youtu.be') return u.pathname.slice(1) || null;
+    return u.searchParams.get('v');
+  } catch {
+    return null;
+  }
+}
+
+// หาเพลงที่เกี่ยวข้องจาก YouTube Mix (list=RD<id>) ของเพลงที่ให้มา
+// excludeIds = id ที่เล่นไปแล้ว กันวนซ้ำ — คืน track หรือ null ถ้าไม่เจอ
+export async function getRelatedTrack(url, excludeIds = []) {
+  const id = videoIdFromUrl(url);
+  if (!id) return null;
+
+  const json = await runJson([
+    '-J', '--flat-playlist', '--no-warnings', '--playlist-end', '15',
+    `https://www.youtube.com/watch?v=${id}&list=RD${id}`,
+  ]);
+  const exclude = new Set([id, ...excludeIds]);
+  const pick = (json.entries || []).filter(Boolean).find((e) => e.id && !exclude.has(e.id));
+  if (!pick) return null;
+
+  return {
+    url: pick.url || `https://www.youtube.com/watch?v=${pick.id}`,
+    title: pick.title || 'ไม่ทราบชื่อเพลง',
+    duration: pick.duration || 0,
+  };
+}
+
 // คืน array ของ track: { url, title, duration }
 // query เป็นได้ทั้งลิงค์เพลงเดียว, ลิงค์ playlist, หรือชื่อเพลง (ค้น YouTube เอาผลแรก)
 export async function resolveTracks(query) {

@@ -2,6 +2,7 @@ import { MessageFlags } from 'discord.js';
 import { getPlayer, peekPlayer, destroyPlayer } from '../../player/index.js';
 import { resolveTracks } from '../../player/ytdlp.js';
 import { fmtDuration } from '../../utils/format.js';
+import { cleanTitle, searchLyrics, chunkLyrics } from '../../utils/lyrics.js';
 
 const LOOP_LABEL = { off: 'ปิด', track: 'วนเพลงเดียว', queue: 'วนทั้งคิว' };
 
@@ -34,27 +35,45 @@ async function requirePlaying(interaction) {
   return player;
 }
 
+async function handlePlay(interaction, { next = false } = {}) {
+  const voiceChannel = interaction.member?.voice?.channel;
+  if (!voiceChannel) {
+    return interaction.reply({ content: 'เข้าห้องเสียงก่อนนะคะ แล้วค่อยสั่งเล่นเพลง', flags: MessageFlags.Ephemeral });
+  }
+
+  await interaction.deferReply();
+  const query = interaction.options.getString('query');
+  const { playlist, tracks } = await resolveTracks(query);
+
+  const player = getPlayer(interaction.guildId, interaction.channel);
+  player.connect(voiceChannel);
+  player.enqueue(tracks, interaction.member.displayName, { next });
+
+  const where = next ? 'ไว้หัวคิว เล่นต่อจากเพลงนี้เลย' : 'เข้าคิวแล้ว';
+  if (playlist) {
+    await interaction.editReply(`✅ เพิ่ม ${tracks.length} เพลงจาก **${playlist}** ${where}ค่ะ`);
+  } else {
+    const t = tracks[0];
+    await interaction.editReply(`✅ เพิ่ม${next ? 'ไว้หัวคิว' : 'เข้าคิว'}: **${t.title}** \`[${fmtDuration(t.duration)}]\``);
+  }
+}
+
 const handlers = {
-  async play(interaction) {
-    const voiceChannel = interaction.member?.voice?.channel;
-    if (!voiceChannel) {
-      return interaction.reply({ content: 'เข้าห้องเสียงก่อนนะคะ แล้วค่อยสั่งเล่นเพลง', flags: MessageFlags.Ephemeral });
-    }
+  play: handlePlay,
 
-    await interaction.deferReply();
-    const query = interaction.options.getString('query');
-    const { playlist, tracks } = await resolveTracks(query);
+  async playnext(interaction) {
+    return handlePlay(interaction, { next: true });
+  },
 
+  async autoplay(interaction) {
+    const mode = interaction.options.getString('mode');
     const player = getPlayer(interaction.guildId, interaction.channel);
-    player.connect(voiceChannel);
-    player.enqueue(tracks, interaction.member.displayName);
-
-    if (playlist) {
-      await interaction.editReply(`✅ เพิ่ม ${tracks.length} เพลงจาก **${playlist}** เข้าคิวแล้วค่ะ`);
-    } else {
-      const t = tracks[0];
-      await interaction.editReply(`✅ เพิ่มเข้าคิว: **${t.title}** \`[${fmtDuration(t.duration)}]\``);
-    }
+    player.autoplay = mode === 'on';
+    await interaction.reply(
+      mode === 'on'
+        ? '🎶 เปิด autoplay แล้วค่ะ คิวหมดเมื่อไหร่จะหาเพลงที่เกี่ยวข้องมาเล่นต่อให้เอง'
+        : '🛑 ปิด autoplay แล้วค่ะ คิวหมดแล้วจะหยุดเล่นตามปกติ'
+    );
   },
 
   async skip(interaction) {
@@ -144,6 +163,37 @@ const handlers = {
     }
     const removed = player.remove(position);
     await interaction.reply(`🗑️ ลบออกจากคิว: **${removed.title}**`);
+  },
+
+  async lyrics(interaction) {
+    const query = interaction.options.getString('query');
+    const player = peekPlayer(interaction.guildId);
+
+    let search;
+    let duration = 0;
+    if (query) {
+      search = query;
+    } else if (player?.current) {
+      search = cleanTitle(player.current.title);
+      duration = player.current.duration;
+    } else {
+      return interaction.reply({
+        content: 'ตอนนี้ไม่มีเพลงกำลังเล่นค่ะ ใส่ชื่อเพลงใน query แทนได้นะคะ',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    await interaction.deferReply();
+    const found = await searchLyrics(search, duration);
+    if (!found) {
+      return interaction.editReply(`หาเนื้อเพลง "${search}" ไม่เจอค่ะ ลองพิมพ์ชื่อเพลงกับศิลปินใน query ดูนะคะ`);
+    }
+
+    const chunks = chunkLyrics(found.lyrics);
+    await interaction.editReply(`📜 **${found.title}** — ${found.artist}\n\n${chunks[0]}`);
+    for (const chunk of chunks.slice(1)) {
+      await interaction.followUp(chunk);
+    }
   },
 
   async volume(interaction) {
