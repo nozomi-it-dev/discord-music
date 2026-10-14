@@ -84,6 +84,19 @@ const handlers = {
     await interaction.reply(`⏭️ ข้าม: **${skipped.title}**`);
   },
 
+  async next(interaction) {
+    return handlers.skip(interaction);
+  },
+
+  async prev(interaction) {
+    const player = peekPlayer(interaction.guildId);
+    if (!player?.played.length) {
+      return interaction.reply({ content: 'ยังไม่มีเพลงก่อนหน้าให้ย้อนกลับค่ะ', flags: MessageFlags.Ephemeral });
+    }
+    const prev = player.previous();
+    await interaction.reply(`⏮️ ย้อนกลับไปเล่น: **${prev.title}**`);
+  },
+
   async stop(interaction) {
     const player = peekPlayer(interaction.guildId);
     if (!player) {

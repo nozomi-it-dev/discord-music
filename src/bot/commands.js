@@ -33,6 +33,12 @@ export const commands = [
     .setName('skip')
     .setDescription('ข้ามเพลงปัจจุบัน'),
   new SlashCommandBuilder()
+    .setName('next')
+    .setDescription('เล่นเพลงถัดไปทันที'),
+  new SlashCommandBuilder()
+    .setName('prev')
+    .setDescription('ย้อนกลับไปเล่นเพลงก่อนหน้า'),
+  new SlashCommandBuilder()
     .setName('stop')
     .setDescription('หยุดเล่น ล้างคิว และออกจากห้อง'),
   new SlashCommandBuilder()

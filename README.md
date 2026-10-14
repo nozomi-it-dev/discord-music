@@ -31,6 +31,8 @@ A Discord bot that plays music from YouTube. Just paste a link or type a song na
 | -------------------- | ----------------------------------------------------------- |
 | `/play <query>`      | Play music from a YouTube link, playlist link, or song name |
 | `/skip`              | Skip the current song                                       |
+| `/next`              | Play the next song immediately (same as `/skip`)            |
+| `/prev`              | Go back to the previous song                                |
 | `/stop`              | Stop playing, clear the queue, and leave the voice channel  |
 | `/pause` / `/resume` | Pause / Resume playback                                     |
 | `/queue`             | View the music queue                                        |

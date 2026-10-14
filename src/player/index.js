@@ -48,6 +48,7 @@ class GuildPlayer {
     this.loopMode = 'off'; // off | track | queue
     this.autoplay = true; // คิวหมดแล้วหาเพลงที่เกี่ยวข้องเล่นต่อเอง
     this.history = []; // id เพลงที่เล่นล่าสุด ไว้กัน autoplay วนเพลงซ้ำ
+    this.played = []; // เพลงที่เล่นจบ/ข้ามไปแล้ว ไว้ให้ /prev ย้อนกลับ
     this.volume = 100;
     this.connection = null;
     this.streamHandle = null;
@@ -112,6 +113,15 @@ class GuildPlayer {
     return skipped;
   }
 
+  // ย้อนไปเพลงก่อนหน้า เพลงปัจจุบันกลับไปรอหัวคิว
+  previous() {
+    const prev = this.played.pop();
+    if (!prev) return null;
+    if (this.current) this.queue.unshift(this.current);
+    this.#startTrack(prev);
+    return prev;
+  }
+
   pause() {
     return this.audioPlayer.pause();
   }
@@ -151,6 +161,7 @@ class GuildPlayer {
     this.destroyed = true;
     this.#clearIdleTimer();
     this.queue = [];
+    this.played = [];
     this.current = null;
     this.#killStream();
     this.audioPlayer.stop(true);
@@ -174,6 +185,11 @@ class GuildPlayer {
       next = this.queue.shift() || null;
     }
     this.forceSkip = false;
+
+    if (finished && next !== finished) {
+      this.played.push(finished);
+      if (this.played.length > 50) this.played.shift();
+    }
 
     if (next) this.#startTrack(next);
     else if (this.autoplay && finished) this.#autoplayNext(finished);
